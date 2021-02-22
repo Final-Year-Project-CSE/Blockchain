@@ -3,9 +3,9 @@ pragma solidity ^0.5.16;
 contract Official {
 
     address owner=msg.sender;
-
+    
     mapping(address => bool) officials;
-
+    uint total_officals;
     modifier officialOnly {
         require(officials[msg.sender]==true || msg.sender==owner);
         _;
@@ -13,9 +13,193 @@ contract Official {
 
     function addOfficial(address _add) public officialOnly{
         officials[_add]=true;
+        total_officals++;
+    }
+    struct Project_Request{
+        string Project_name;
+        string document_url;
+        string purpose;
+        address requester;
+        bool isComplete;
+        uint voters;//this will keep count of positive vote count only
+        mapping(address=>bool) voted_officials;
+    }
+}
+
+contract Project is Official{
+    
+    string Project_name;
+    string document_url;
+    string purpose;
+    address[] deployedProjects;
+    Central_Authority fatherbranch;
+    //I cannot pass struct as an argument in the functions or constructors in cross contract calls
+    constructor(string memory _Project_name,string memory _document_url,string memory _purpose,address _requester,Central_Authority _father) public{
+        owner = _requester;
+        Project_name = _Project_name;
+        document_url = _document_url;
+        purpose = _purpose;
+        fatherbranch = _father;
+    }
+    
+    
+    function getDeployedProjects() public view returns (address[] memory){
+        return deployedProjects;
+    }
+    
+    string public verification_result;
+    
+    function verifyPending_Projects() public returns (string memory){
+        //this will call the Central_Authority project evalution function and 
+        //that function will check if the officials of Central_Authority has passed the project or not
+        //if the project is been passed then list of projects is receieved and it is added to the deployedProjects[]
+        Project  data = fatherbranch.verifyPending_Projects(msg.sender);
+        Project empty;
+        if(data == empty){
+            verification_result = "No New Project added";
+        }
+        else{
+            deployedProjects.push(address(data));
+            verification_result = "new Project Added";
+        }
+        return verification_result;
+    }
+    
+    function addNewProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public{
+        //In this function we will check that only Officials can make request and all the data is validity
+        // we will pass data to addNewProjectRequest function of Central_Authority contract
+        require(officials[msg.sender]);//check for Official
+        bytes memory strBytes = bytes(_projectName);
+        require(strBytes.length != 0);
+        strBytes = bytes(_purpose);
+        require(strBytes.length != 0);
+        strBytes = bytes(_url);
+        require(strBytes.length != 0);
+        
+        fatherbranch.addNewProjectRequest(_projectName,_url,_purpose,msg.sender);
+        
+    }
+    
+}
+
+contract Central_Authority is Official{
+    
+    Project public central;
+    function createProject(Project_Request memory _request) private returns (Project ){
+        Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.requester,this);
+        return newProject;
     }
 
+    Project_Request[] requestedProjects;
+    
+    constructor() public {
+        Project_Request memory request = Project_Request({
+            Project_name:"Central_Authority",
+            document_url:"",
+            purpose:'',
+            requester:owner,
+            isComplete:true,
+            voters:0
+        });
+        central = createProject(request);
+    }
+    
+    
+    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose,address _requester) public returns (string memory){
+        //In this function we will make the struct of current request and add that to the list of requestedProjects[]
+        Project_Request memory new_request = Project_Request({
+            Project_name:_Project_name,
+            document_url:_document_url,
+            purpose:_purpose,
+            requester:_requester,
+            isComplete:false,
+            voters:0
+        });
+        
+        string memory res="";
+        
+        uint n = requestedProjects.length;
+        for(uint i=0;i<n;i++){
+            if(requestedProjects[i].requester == _requester){
+                if(!requestedProjects[i].isComplete){
+                    res = "There is already a request Added";
+                    return res;
+                }
+            }
+        }
+        requestedProjects.push(new_request);
+        res = "Request Added";
+        return res;
+    }
+    
+    function voteForProject(uint index,bool decision) public{
+        require(officials[msg.sender]);//current person is Official
+        Project_Request storage request = requestedProjects[index];
+        
+        require(!request.voted_officials[msg.sender]);//the person has not voted so far
+        
+        request.voted_officials[msg.sender]=true;
+        if(decision)
+            request.voters++;
+        
+    }
+    
+    function verifyPending_Projects(address curr_person) public returns(Project){
+        
+        Project newProject;
+        uint n = requestedProjects.length;
+        for(uint i=0;i<n;i++){
+            if(requestedProjects[i].requester == curr_person){
+                if(requestedProjects[i].voters >= total_officals && !requestedProjects[i].isComplete){
+                    
+                    newProject = createProject(requestedProjects[i]);
+                    
+                    requestedProjects[i].isComplete = true;
+                }
+            }
+        }
+        
+        return newProject;
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 contract TaxCollection is Official{
 
@@ -130,124 +314,7 @@ contract TaxCollection is Official{
         // call event;
     }
 
-contract RationScheme is Official{
-
-    struct Item {
-        uint code;
-        string name;
-        uint pricePerUnit;
-    }
-
-    mapping(uint => Item) items;
-    uint itemCount;
-
-    struct Beneficiary {
-        bool exists;
-        uint id;
-        string name;
-        address benfAddress;
-        mapping(uint => uint) itemUnitsConsumed; // mapping from item code to units of item consumed;
-    }
-
-    mapping(uint => Beneficiary) beneficiaries;
-    mapping(address => uint) beneficiariesByAddress;
-    uint benfCount;
-
-    modifier BeneficiaryOnly {
-        require(beneficiaries[beneficiariesByAddress[msg.sender]].exists);
-        _;   
-    }
-
-    struct Agent {
-        uint id;
-        string name;
-        uint areaCode;
-        string area;
-        // other factors
-        address wallet;
-        /* keep track of items distributed too
-        {
-            units in stock
-            units distributed
-            bare minimum required
-            when stock falls down below bare minimum, buy more units using balance in wallet..
-
-
-            // come up with an idea to fill stock using ether in wallet
-        }
-        */
-        uint fundsGranted;
-        uint fundsUsed;
-    }
-
-    mapping(uint => Agent) agents;
-    uint agentCount;
-
-    constructor() public {
-        benfCount=0;
-        agentCount=0;
-        itemCount=0;
-    }
-
-    function getSchemeFundsBalance() public view returns (uint) {
-        return address(this).balance;;
-    }
-
-    function() payable {} // so that other accounts can send ether to the account of this smart contract
-
-    function addItem(string _itemName, uint _unitPrice) public {
-        items[itemCount]=Item(itemCount, _itemName, _unitPrice);
-        for(uint _i=0; _i<benfCount; _i++) {
-            beneficiaries[_i].itemUnitsConsumed[itemCount]=0;
-        }
-        ++itemCount;
-    }
-
-    function addBeneficiary(string _name, address _address) {
-        beneficiaries[benfCount].exists=true;
-        beneficiaries[benfCount].id=benfCount;
-        beneficiaries[benfCount].name=_name;
-        beneficiaries[benfCount].benfAddress=_address;
-        for(uint _i=0; _i<itemCount; _i++) {
-            beneficiaries[benfCount].itemUnitsConsumed[_i]=0; // initially no units consumed
-        }
-        beneficiariesByAddress[_address]=benfCount;
-        ++benfCount;
-    }
-
-    function addAgent() {
-        //figure out all parameters
-    }
-
-    function grantFundsToAgent(uint _agentID, uint _amount) public /* payable */ officialOnly {
-
-        // before alloting further funds, check for prior transactions of the agent, check if distribution was fairly done 
-
-        agents[_agentID].wallet.transfer(_amount);
-        agents[_agentID].fundsGranted+=_amount;
-    }
-
-    function getRation() public BeneficiaryOnly{
-        // we want a list of item codes with quantity
-        // figure out a generic way to do that
-
-        // then for each item code
-        // beneficiaries[beneficiariesByAddress[msg.sender]].itemUnitsConsumed[code]+=quantity
-    }
-
-    function stockUpItem(uint _itemCode, uint _quantity) { // modifier by agent
-        uint _totalAmount = items[_itemCode].pricePerUnit*_quantity;
-        // access agents by address too
-
-        //required that fundsGranted-fundsUsed>=_totalAmount
-        // fundsUsed+=_totalAmount
-
-        // stock[_itemCode]+=_quantity
-    }
-    // check every time amount of funds is equal to food amount distributed, if not terminate agent rights
-    // agent cancelled, will not recieve any more funds.
 }
-
 
 // normal variable name => state variable; starting from underscore => local variable
 // web3, web3.eth
