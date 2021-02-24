@@ -7,8 +7,13 @@ contract Official {
     mapping(address => bool) officials;
     uint total_officals;
     modifier officialOnly {
-        require(officials[msg.sender]==true || msg.sender==owner);
+        require(officials[msg.sender]==true);
         _;
+    }
+
+    constructor() public {
+        total_officals=0;
+        addOfficial(owner);
     }
 
     function addOfficial(address _add) public officialOnly{
@@ -51,24 +56,23 @@ contract Project is Official{
     
     function verifyPending_Projects() public returns (string memory){
         //this will call the Central_Authority project evalution function and 
-        //that function will check if the officials of Central_Authority has passed the project or not
-        //if the project is been passed then list of projects is receieved and it is added to the deployedProjects[]
-        Project  data = fatherbranch.verifyPending_Projects(msg.sender);
-        Project empty;
+        //that function will check if the officials of Central_Authority has passed its sub-project or not
+        //if the project has been passed then list of projects is receieved and it is added to the deployedProjects[]
+        Project  data = fatherbranch.verifyPending_Projects(msg.sender); // why do we explicitly need to pass msg.sender? 
+        Project empty; // are we sure this wont waste memory? and are we sure the new project contract created and returned will persist?
         if(data == empty){
             verification_result = "No New Project added";
         }
         else{
             deployedProjects.push(address(data));
-            verification_result = "new Project Added";
+            verification_result = "New Project Added";
         }
         return verification_result;
     }
     
-    function addNewProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public{
-        //In this function we will check that only Officials can make request and all the data is validity
+    function addNewSubProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public officialOnly{
+        //In this function we will check that only Officials can make request and all the data is valid
         // we will pass data to addNewProjectRequest function of Central_Authority contract
-        require(officials[msg.sender]);//check for Official
         bytes memory strBytes = bytes(_projectName);
         require(strBytes.length != 0);
         strBytes = bytes(_purpose);
@@ -82,10 +86,10 @@ contract Project is Official{
     
 }
 
-contract Central_Authority is Official{
+contract Central_Authority is Official{ // central authority has no direct access to the list of projects
     
-    Project public central;
-    function createProject(Project_Request memory _request) private returns (Project ){
+    Project public central; // do we need this? it aint used anywhere. or maybe central can somehow include taxation
+    function createProject(Project_Request memory _request) private returns (Project ){ // is it possible to create contracts like this?
         Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.requester,this);
         return newProject;
     }
@@ -105,13 +109,13 @@ contract Central_Authority is Official{
     }
     
     
-    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose,address _requester) public returns (string memory){
+    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose, address _requester) public returns (string memory) {
         //In this function we will make the struct of current request and add that to the list of requestedProjects[]
         Project_Request memory new_request = Project_Request({
             Project_name:_Project_name,
             document_url:_document_url,
             purpose:_purpose,
-            requester:_requester,
+            requester:_requester, // why not use msg.sender? (probable reason:-maybe msg.sender=contract address but that actually sounds fine, will help identify the parent project of the sub project)
             isComplete:false,
             voters:0
         });
@@ -120,7 +124,7 @@ contract Central_Authority is Official{
         
         uint n = requestedProjects.length;
         for(uint i=0;i<n;i++){
-            if(requestedProjects[i].requester == _requester){
+            if(requestedProjects[i].requester == msg.sender){ // if this official has an already incomplete project request, first that has to be completed
                 if(!requestedProjects[i].isComplete){
                     res = "There is already a request Added";
                     return res;
@@ -132,8 +136,7 @@ contract Central_Authority is Official{
         return res;
     }
     
-    function voteForProject(uint index,bool decision) public{
-        require(officials[msg.sender]);//current person is Official
+    function voteForProject(uint _index,bool _decision) public officialOnly {
         Project_Request storage request = requestedProjects[index];
         
         require(!request.voted_officials[msg.sender]);//the person has not voted so far
@@ -144,7 +147,7 @@ contract Central_Authority is Official{
         
     }
     
-    function verifyPending_Projects(address curr_person) public returns(Project){
+    function verifyPending_Projects(address _curr_person) public returns(Project){ // who is curr_person? why didnt you use msg.sender
         
         Project newProject;
         uint n = requestedProjects.length;
@@ -162,44 +165,6 @@ contract Central_Authority is Official{
         return newProject;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 contract TaxCollection is Official{
 
@@ -295,6 +260,7 @@ contract TaxCollection is Official{
 
     function payTax() public taxNotPaid payable {
         address(this).transfer(calculateTax()); // asynchronous; next statement should only execute once this has returned, make sure of that afterwards
+        // check who pays wei here
         taxPayers[msg.sender].taxPaid=true;
         // call event;
     }
@@ -311,6 +277,7 @@ contract TaxCollection is Official{
 
     function grantFunds(address payable _schemeContractAddress, uint _amount) public officialOnly {
         _schemeContractAddress.transfer(_amount); // not correct, make sure money is transferred from the contract account, not from the account of the official calling this function
+        // check who pays wei here
         // call event;
     }
 
