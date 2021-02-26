@@ -29,6 +29,14 @@ contract Official {
         uint voters;//this will keep count of positive vote count only
         mapping(address=>bool) voted_officials;
     }
+    struct Money_Request{
+        string subject;
+        string document_url;
+        address requester;
+        bool isComplete;
+        uint voters;//this will keep count of positive vote count only
+        mapping(address=>bool) voted_officials;
+    }
 }
 
 contract Project is Official{
@@ -84,6 +92,11 @@ contract Project is Official{
         
     }
     
+    function requestMoney(string memory _subject,string memory _document_url) public {
+        require(msg.sender == owner);
+        fatherbranch.requestMoney(_subject,_document_url,this);
+    }
+    
 }
 
 contract Central_Authority is Official{ // central authority has no direct access to the list of projects
@@ -95,7 +108,7 @@ contract Central_Authority is Official{ // central authority has no direct acces
     }
 
     Project_Request[] requestedProjects;
-    
+    Money_Request[] requestQueue;
     constructor() public {
         Project_Request memory request = Project_Request({
             Project_name:"Central_Authority",
@@ -163,6 +176,12 @@ contract Central_Authority is Official{ // central authority has no direct acces
         }
         
         return newProject;
+    }
+    
+    function requestMoney(string memory _subject,string memory _document_url,Project _requester) public{
+        
+        
+        
     }
 }
 
@@ -282,12 +301,3 @@ contract TaxCollection is Official{
     }
 
 }
-
-// normal variable name => state variable; starting from underscore => local variable
-// web3, web3.eth
-
-
-/* Arrays
-type[] name;
-name.push(value);
-*/
