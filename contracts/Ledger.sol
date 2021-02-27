@@ -6,6 +6,7 @@ contract Official {
     
     mapping(address => bool) officials;
     uint total_officals;
+
     modifier officialOnly {
         require(officials[msg.sender]==true);
         _;
@@ -20,6 +21,7 @@ contract Official {
         officials[_add]=true;
         total_officals++;
     }
+
     struct Project_Request{
         string Project_name;
         string document_url;
@@ -29,11 +31,12 @@ contract Official {
         uint voters;//this will keep count of positive vote count only
         mapping(address=>bool) voted_officials;
     }
-    struct Money_Request{
+    struct Grant_Request{
         string subject;
         string document_url;
-        address requester;
-        bool isComplete;
+        address project; // we must only need the address of the project for which the grant is requested, because the requester will obviously have to be an official in charge of that project (we will also make sure that a grant is requested only when a certain percentage of officials in charge of that project have voted for the request to be initiated, that has to be a part of Project contract)
+        bool isAccepted; // true means grant has been sanctioned, and money has already been transfered to the corresponding project, false does not mean it is rejected, it may mean that it has not been reviewed yet, so we need to have a different variable to see if it is pending or has been reviewed
+        bool isPending; // will be true initially, set to true when isAccepted is either set to true or false
         uint voters;//this will keep count of positive vote count only
         mapping(address=>bool) voted_officials;
     }
@@ -44,8 +47,10 @@ contract Project is Official{
     string Project_name;
     string document_url;
     string purpose;
+    // need to find out a way to store the current progress status of the project, is it on time, behind schedule, how much work is done, etc.
     address[] deployedProjects;
     Central_Authority fatherbranch;
+
     //I cannot pass struct as an argument in the functions or constructors in cross contract calls
     constructor(string memory _Project_name,string memory _document_url,string memory _purpose,address _requester,Central_Authority _father) public{
         owner = _requester;
@@ -55,17 +60,20 @@ contract Project is Official{
         fatherbranch = _father;
     }
     
-    
     function getDeployedProjects() public view returns (address[] memory){
         return deployedProjects;
     }
     
-    string public verification_result;
+    // string public verification_result; // what purpose does it solve?
+    // verification result is the output that has to be returned to the official on the front end, need not be saved on the blockchain
     
-    function verifyPending_Projects() public returns (string memory){
+    function verifyPending_Projects() public returns (string memory) { // as we wont be able to return a list, we can consider having an input of request ID, so that we can get the result for a particular request
         //this will call the Central_Authority project evalution function and 
         //that function will check if the officials of Central_Authority has passed its sub-project or not
         //if the project has been passed then list of projects is receieved and it is added to the deployedProjects[]
+        
+        string memory verification_result; // we can actually just return a string directly without saving it in any variable.
+
         Project  data = fatherbranch.verifyPending_Projects(msg.sender); // why do we explicitly need to pass msg.sender? 
         Project empty; // are we sure this wont waste memory? and are we sure the new project contract created and returned will persist?
         if(data == empty){
@@ -76,6 +84,8 @@ contract Project is Official{
             verification_result = "New Project Added";
         }
         return verification_result;
+
+        //if we have the list of requested projects for this project then we can check the request status of each project
     }
     
     function addNewSubProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public officialOnly{
@@ -92,9 +102,9 @@ contract Project is Official{
         
     }
     
-    function requestMoney(string memory _subject,string memory _document_url) public {
+    function requestGrant(string memory _subject,string memory _document_url) public {
         require(msg.sender == owner);
-        fatherbranch.requestMoney(_subject,_document_url,this);
+        fatherbranch.requestGrant(_subject,_document_url,this);
     }
     
 }
@@ -108,7 +118,7 @@ contract Central_Authority is Official{ // central authority has no direct acces
     }
 
     Project_Request[] requestedProjects;
-    Money_Request[] requestQueue;
+    Grant_Request[] requestQueue;
     constructor() public {
         Project_Request memory request = Project_Request({
             Project_name:"Central_Authority",
@@ -178,7 +188,7 @@ contract Central_Authority is Official{ // central authority has no direct acces
         return newProject;
     }
     
-    function requestMoney(string memory _subject,string memory _document_url,Project _requester) public{
+    function requestGrant(string memory _subject,string memory _document_url,Project _requester) public{
         
         
         

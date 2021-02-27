@@ -42,11 +42,17 @@ module.exports = {
     // tab if you use this network and you must also set the `host`, `port` and `network_id`
     // options below to some value.
     //
-    // development: {
-    //  host: "127.0.0.1",     // Localhost (default: none)
-    //  port: 8545,            // Standard Ethereum port (default: none)
-    //  network_id: "*",       // Any network (default: none)
-    // },
+     development: {
+      host: "127.0.0.1",     // Localhost (default: none)
+      port: 7545,            // Standard Ethereum port (default: none) // it was initially 8545
+      network_id: "*",       // Any network (default: none) // I can se 5777 on ganache but that may change everytime I start ganache
+     },
+     rinkeby: {
+      host: "localhost",
+      port: 8545, // default port of geth
+      network_id: "*", // 4: network id of rinkeby test network
+      // gas: 4700000
+     }
     // Another network with more advanced options...
     // advanced: {
     // port: 8777,             // Custom port
