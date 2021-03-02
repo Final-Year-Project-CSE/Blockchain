@@ -26,7 +26,8 @@ contract Official {
         string Project_name;
         string document_url;
         string purpose;
-        address requester;
+        address official_incharge;
+        address parent_project;
         bool isComplete;
         uint voters;//this will keep count of positive vote count only
         mapping(address=>bool) voted_officials;
@@ -47,13 +48,20 @@ contract Project is Official{
     string Project_name;
     string document_url;
     string purpose;
+    address parent_project;
     // need to find out a way to store the current progress status of the project, is it on time, behind schedule, how much work is done, etc.
     address[] deployedProjects;
     Central_Authority fatherbranch;
 
     //I cannot pass struct as an argument in the functions or constructors in cross contract calls
-    constructor(string memory _Project_name,string memory _document_url,string memory _purpose,address _requester,Central_Authority _father) public{
-        owner = _requester;
+    constructor(string memory _Project_name,
+            string memory _document_url,
+            string memory _purpose,
+            address _official_incharge,
+            Central_Authority _father,
+            address _parent_project) public{
+        owner = _official_incharge;
+        parent_project = _parent_project;
         Project_name = _Project_name;
         document_url = _document_url;
         purpose = _purpose;
@@ -113,7 +121,7 @@ contract Central_Authority is Official{ // central authority has no direct acces
     
     Project public central; // do we need this? it aint used anywhere. or maybe central can somehow include taxation
     function createProject(Project_Request memory _request) private returns (Project ){ // is it possible to create contracts like this?
-        Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.requester,this);
+        Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.official_incharge,this,_request.parent_project);
         return newProject;
     }
 
@@ -124,7 +132,8 @@ contract Central_Authority is Official{ // central authority has no direct acces
             Project_name:"Central_Authority",
             document_url:"",
             purpose:'',
-            requester:owner,
+            official_incharge:owner,
+            parent_project:owner,
             isComplete:true,
             voters:0
         });
@@ -132,13 +141,14 @@ contract Central_Authority is Official{ // central authority has no direct acces
     }
     
     
-    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose, address _requester) public returns (string memory) {
+    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose, address _official_incharge,address _parent_project) public returns (string memory) {
         //In this function we will make the struct of current request and add that to the list of requestedProjects[]
         Project_Request memory new_request = Project_Request({
             Project_name:_Project_name,
             document_url:_document_url,
             purpose:_purpose,
-            requester:_requester, // why not use msg.sender? (probable reason:-maybe msg.sender=contract address but that actually sounds fine, will help identify the parent project of the sub project)
+            official_incharge:_official_incharge,
+            parent_project:_parent_project, // why not use msg.sender? (probable reason:-maybe msg.sender=contract address but that actually sounds fine, will help identify the parent project of the sub project)
             isComplete:false,
             voters:0
         });
