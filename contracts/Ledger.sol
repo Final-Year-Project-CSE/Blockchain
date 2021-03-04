@@ -38,7 +38,6 @@ contract Project is Official{
         address official_incharge;
         address parent_project;
         bool isComplete;
-        uint token_no;
         uint voters;//this will keep count of positive vote count only
         mapping(address=>bool) voted_officials;
     }
@@ -100,7 +99,7 @@ contract Project is Official{
             verification_result = "No New Project added";
         }
         else{
-            deployedProjects.push(address(data));
+            deployedProjects[token_no] = address(data);
             verification_result = "New Project Added";
         }
         return verification_result;
@@ -177,7 +176,7 @@ contract Project is Official{
         
         request.voted_officials[msg.sender]=true;
         request.totalVotes++;
-        if(decision)
+        if(_decision)
             request.positiveVotes++;
 
         // vote from the head of the project is a must in addition to the voting limit to be met
@@ -258,7 +257,6 @@ contract Central_Authority is Official{
             purpose:'',
             official_incharge:owner,
             parent_project:owner,
-            token_no:0,
             isComplete:true,
             voters:0
         });
@@ -278,7 +276,6 @@ contract Central_Authority is Official{
             official_incharge:_official_incharge,
             parent_project:msg.sender,
             isComplete:false,
-            token_no:token,
             voters:0
         });
         
@@ -296,7 +293,7 @@ contract Central_Authority is Official{
         require(!request.voted_officials[msg.sender]);//the person has not voted so far
         
         request.voted_officials[msg.sender]=true;
-        if(decision)
+        if(_decision)
             request.voters++;
         
     }
@@ -305,10 +302,10 @@ contract Central_Authority is Official{
         
         Project newProject;
         // uint n = requestedProjects.length;
-        Project_Request current_req = requestedProjects[_token];
+        Project_Request storage current_req = requestedProjects[_token];
         //if value for some key doesn't exist the mapping will return the default value of that data type
         //as I have custom mapping so need to following below method
-        Project_Request cmp;
+        Project_Request memory cmp;
         require(current_req != cmp);//case for invalid token
         require(current_req.parent_project == msg.sender);
 
@@ -318,7 +315,7 @@ contract Central_Authority is Official{
             
             current_req.isComplete = true;
 
-            deployed_projects[current_req.token_no] = newProject;
+            deployed_projects[_token] = newProject;
         }
         
         return newProject;
