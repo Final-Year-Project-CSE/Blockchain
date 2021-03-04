@@ -83,10 +83,6 @@ contract Project is Official{
     }
 
     function() payable external {}
-
-    function getAddress() public view returns (address) {
-        return this.address;
-    }
     
     // string public verification_result; // what purpose does it solve?
     // verification result is the output that has to be returned to the official on the front end, need not be saved on the blockchain
@@ -98,7 +94,7 @@ contract Project is Official{
         
         string memory verification_result; // we can actually just return a string directly without saving it in any variable.
 
-        Project  data = fatherbranch.verifyPending_Projects(token_no,this); // why do we explicitly need to pass msg.sender? 
+        Project  data = fatherbranch.verifyPending_Projects(token_no); // why do we explicitly need to pass msg.sender? 
         Project empty; // are we sure this wont waste memory? and are we sure the new project contract created and returned will persist?
         if(data == empty){
             verification_result = "No New Project added";
@@ -113,7 +109,7 @@ contract Project is Official{
     }
     
     
-    function addNewSubProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public officialOnly returns (uint){
+    function addNewSubProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public ownerOnly returns (uint){
         //In this function we will check that only Officials can make request and all the data is valid
         // we will pass data to addNewProjectRequest function of Central_Authority contract
         bytes memory strBytes = bytes(_projectName);
@@ -123,7 +119,7 @@ contract Project is Official{
         strBytes = bytes(_url);
         require(strBytes.length != 0);
         
-        return fatherbranch.addNewProjectRequest(_projectName,_url,_purpose,msg.sender,this);
+        return fatherbranch.addNewProjectRequest(_projectName,_url,_purpose,msg.sender);
         //returning the token no.
     }
     
@@ -268,11 +264,11 @@ contract Central_Authority is Official{
         });
         token = 1;
         central = createProject(request);
-        taxCollection = new TaxCollection(owner, central.getAddress());
+        taxCollection = new TaxCollection(owner, address(this));
     }
     
     
-    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose, address _official_incharge,address _parent_project) public returns (uint) {
+    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose, address _official_incharge) public returns (uint) {
         //In this function we will make the struct of current request and add that to the list of requestedProjects[]
         
         Project_Request memory new_request = Project_Request({
@@ -280,7 +276,7 @@ contract Central_Authority is Official{
             document_url:_document_url,
             purpose:_purpose,
             official_incharge:_official_incharge,
-            parent_project:_parent_project, // why not use msg.sender? (probable reason:-maybe msg.sender=contract address but that actually sounds fine, will help identify the parent project of the sub project)
+            parent_project:msg.sender,
             isComplete:false,
             token_no:token,
             voters:0
@@ -290,7 +286,7 @@ contract Central_Authority is Official{
 
         token++;
         
-        return token;
+        return token-1;
     }
 
     //here index reassemble token
@@ -305,18 +301,18 @@ contract Central_Authority is Official{
         
     }
     
-    function verifyPending_Projects(uint _token, address _requesting_project) public returns(Project){ // who is curr_person? why didnt you use msg.sender
+    function verifyPending_Projects(uint _token) public returns(Project){ // who is curr_person? why didnt you use msg.sender
         
         Project newProject;
         // uint n = requestedProjects.length;
-        Project_Request current_req = requestedProjects[token];
+        Project_Request current_req = requestedProjects[_token];
         //if value for some key doesn't exist the mapping will return the default value of that data type
         //as I have custom mapping so need to following below method
         Project_Request cmp;
         require(current_req != cmp);//case for invalid token
-        require(current_req.parent_project == _requesting_project);
+        require(current_req.parent_project == msg.sender);
 
-        if(current_req.voters >= total_officals && !current_req.isComplete){
+        if(current_req.voters >= total_officals && !current_req.isComplete){ //currently it requires all of the officials to vote in favour
             
             newProject = createProject(current_req);
             
@@ -328,11 +324,16 @@ contract Central_Authority is Official{
         return newProject;
     }
 
+    function grantFundsToCentralProject(uint _amount) public ownerOnly {
+        address(central).transfer(_amount); 
+        // call event;
+    }
+
 }
 
 contract TaxCollection is Official{
 
-    address centralProjectAddress;
+    address centralAuthorityAddress;
 
     struct TaxBracket {
         uint code;
@@ -361,11 +362,11 @@ contract TaxCollection is Official{
         _;
     }
 
-    constructor(address _owner, address _centralProjectAddress) public {
+    constructor(address _owner, address _centralAuthorityAddress) public {
         owner=_owner;
         taxPayerCount=0;
         bracketCount=0;
-        centralProjectAddress=_centralProjectAddress;
+        centralAuthorityAddress=_centralAuthorityAddress;
     }
 
     function getBudgetBalance() public view returns (uint) {
@@ -441,8 +442,8 @@ contract TaxCollection is Official{
         return taxPayers[taxPayersAddresses[_id]].taxPaid;
     }
 
-    function grantFundsToCentralProject(uint _amount) public ownerOnly {
-        centralProjectAddress.transfer(_amount); 
+    function grantFundsToCentralAuthority(uint _amount) public ownerOnly {
+        centralAuthorityAddress.transfer(_amount); 
         // call event;
     }
 
