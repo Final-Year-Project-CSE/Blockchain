@@ -2,7 +2,7 @@ pragma solidity ^0.5.16;
 
 contract Official {
 
-    address owner=msg.sender;
+    address owner;
     
     mapping(address => bool) officials;
     uint total_officals;
@@ -12,7 +12,13 @@ contract Official {
         _;
     }
 
+    modifier ownerOnly {
+        require(msg.sender==owner);
+        _;
+    }
+
     constructor() public {
+        owner=msg.sender;
         total_officals=0;
         addOfficial(owner);
     }
@@ -21,29 +27,25 @@ contract Official {
         officials[_add]=true;
         total_officals++;
     }
+}
 
-    struct Project_Request{
-        string Project_name;
-        string document_url;
-        string purpose;
-        address official_incharge;
-        address parent_project;
-        bool isComplete;
-        uint voters;//this will keep count of positive vote count only
-        mapping(address=>bool) voted_officials;
-    }
+contract
+
+contract Project is Official{
+
     struct Grant_Request{
         string subject;
         string document_url;
+        uint weiRequested;
         address project; // we must only need the address of the project for which the grant is requested, because the requester will obviously have to be an official in charge of that project (we will also make sure that a grant is requested only when a certain percentage of officials in charge of that project have voted for the request to be initiated, that has to be a part of Project contract)
         bool isAccepted; // true means grant has been sanctioned, and money has already been transfered to the corresponding project, false does not mean it is rejected, it may mean that it has not been reviewed yet, so we need to have a different variable to see if it is pending or has been reviewed
         bool isPending; // will be true initially, set to true when isAccepted is either set to true or false
-        uint voters;//this will keep count of positive vote count only
+        bool isOpen; // after the request is granted it needs to be closed
+        uint totalVotes;
+        uint positiveVotes;
         mapping(address=>bool) voted_officials;
+        bool ownerApproved;
     }
-}
-
-contract Project is Official{
     
     string Project_name;
     string document_url;
@@ -52,6 +54,8 @@ contract Project is Official{
     // need to find out a way to store the current progress status of the project, is it on time, behind schedule, how much work is done, etc.
     address[] deployedProjects;
     Central_Authority fatherbranch;
+
+    Grant_Request[] grantRequestsQueue;
 
     //I cannot pass struct as an argument in the functions or constructors in cross contract calls
     constructor(string memory _Project_name,
@@ -66,6 +70,12 @@ contract Project is Official{
         document_url = _document_url;
         purpose = _purpose;
         fatherbranch = _father;
+    }
+
+    function() payable external {}
+
+    function getAddress() public view returns (address) {
+        return this.address;
     }
     
     function getDeployedProjects() public view returns (address[] memory){
@@ -96,7 +106,7 @@ contract Project is Official{
         //if we have the list of requested projects for this project then we can check the request status of each project
     }
     
-    function addNewSubProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public officialOnly{
+    function addNewSubProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public ownerOnly {
         //In this function we will check that only Officials can make request and all the data is valid
         // we will pass data to addNewProjectRequest function of Central_Authority contract
         bytes memory strBytes = bytes(_projectName);
@@ -110,23 +120,131 @@ contract Project is Official{
         
     }
     
-    function requestGrant(string memory _subject,string memory _document_url) public {
-        require(msg.sender == owner);
-        fatherbranch.requestGrant(_subject,_document_url,this);
+    function requestGrant(string memory _subject,string memory _document_url,uint _weiAmountRequested) public ownerOnly returns (string, int) {
+        return Project(parent_project).handleGrantRequest(_subject, _document_url, _weiAmountRequested); // gotta make sure the instance parent project created here is not permanently stored on blockchain, it has to be just a storage pointer to the already deployed project and should be removed from memory when this function is returned
+    }
+
+    function checkRequestStatus(uint _requestID) public returns (bool, bool) {
+        return Project(parent_project).grantApprovalCheck(_requestID);
+    }
+
+    function handleGrantRequest(string memory _subject,string memory _document_url, uint _weiAmountRequested) external returns (string, int) {
+
+        // check if the requesting project is a sub project
+        uint n = deployedProjects.length;
+        for(uint i=0; i<n; ++i){
+            if(deployedProjects[i]==msg.sender) {
+                grantRequestsQueue.push( Grant_Request ({
+                    subject: _subject,
+                    document_url: _document_url,
+                    weiRequested: _weiAmountRequested,
+                    project: msg.sender,
+                    isAccepted: false,
+                    isPending: true,
+                    isOpen: true,
+                    totalVotes: 0,
+                    positiveVotes: 0,
+                    ownerApproved: false
+                }));
+                return ("Request Added", grantRequestsQueue.length-1);
+            }
+        }
+        return ("Request Inapplicable", -1);
+    }
+
+    function grantApprovalCheck(uint _index) external view returns (bool, bool) { // a function to be called by a sub project to check status of request thats why external
+        Grant_Request storage request = grantRequestsQueue[_index];
+        return (request.isPending, request.isAccepted);
+    }
+
+    function haveSufficientFunds(uint _weiAmount) private returns (bool) {
+        if(this.balance > (2 ether + _weiAmount)) { // 2 ether is added to maintain a minimum balance in contract to perform other necessary operations, amount can be changed as required
+            return true;
+        } return false;
+    }
+
+    function grantFunds(address _projectAddress, uint _weiRequested) private {
+        _projectAddress.transfer(_weiRequested);
+    }
+
+    function voteForGrant(uint _index,bool _decision) public officialOnly {
+        Grant_Request storage request = grantRequestsQueue[_index];
+        
+        require(!request.voted_officials[msg.sender]);
+        
+        request.voted_officials[msg.sender]=true;
+        request.totalVotes++;
+        if(decision)
+            request.positiveVotes++;
+
+        // vote from the head of the project is a must in addition to the voting limit to be met
+        if(msg.sender==owner)
+            request.ownerApproved=true;
+
+        if(request.ownerApproved==true && request.positiveVotes > 0.7*total_officals)
+        {
+            request.isPending=false;
+            request.isAccepted=true;
+        } else if (request.totalVotes - request.positiveVotes >= 0.3*total_officals) {
+            request.isPending=false;
+            request.isAccepted=false;
+        }
     }
     
+    function initiatePeriodicDistribution() public ownerOnly {
+
+        // for now the distribution rule is that the older requests are given higher priority
+        // each project is given at max a limited ether (which can be decided) so that all funds are not assigned to a single project
+
+        uint maxFunds = 2 ether; // will be assigned value in wei not ether
+        uint weiToBeGranted;
+
+        uint n = grantRequestsQueue.length;
+        for(uint i = 0; i<n; ++i) {
+            Grant_Request storage request = grantRequestsQueue[i];
+            if(request.isOpen && request.isAccepted) {
+                weiToBeGranted = request.weiRequested<maxFunds ? request.weiRequested : maxFunds;
+                if(haveSufficientFunds(weiToBeGranted)) {
+                    grantFunds(request.project, weiToBeGranted);
+                    // emit an event to notify the project that it has been granted funds. the event can be somehow used in the front end to generate some email notification
+                    request.weiRequested = request.weiRequested - weiToBeGranted;
+                    if(request.weiRequested==0) // if all requested funds granted, close request
+                        request.isOpen=false;
+                }
+                else // if funds were not enough for this request, we obviously dont have sufficient funds for further requests too as requests after this are relatively newer and are most probably having wei demands even higher therefore no point of checking further
+                    break;
+            }
+        }
+    }
+
 }
 
-contract Central_Authority is Official{ // central authority has no direct access to the list of projects
+contract Central_Authority is Official{
+
+    // not only central but central authority also needs money so as to provide gas for its operations tax collection has to grant funds to central authority too
+
+    struct Project_Request{
+        string Project_name;
+        string document_url;
+        string purpose;
+        address official_incharge;
+        address parent_project;
+        bool isComplete;
+        uint voters;//this will keep count of positive vote count only
+        mapping(address=>bool) voted_officials;
+    }
     
-    Project public central; // do we need this? it aint used anywhere. or maybe central can somehow include taxation
-    function createProject(Project_Request memory _request) private returns (Project ){ // is it possible to create contracts like this?
+    Project public central;
+
+    TaxCollection taxCollection;
+
+    function createProject(Project_Request memory _request) private returns (Project ) {
         Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.official_incharge,this,_request.parent_project);
         return newProject;
     }
 
     Project_Request[] requestedProjects;
-    Grant_Request[] requestQueue;
+    
     constructor() public {
         Project_Request memory request = Project_Request({
             Project_name:"Central_Authority",
@@ -138,6 +256,7 @@ contract Central_Authority is Official{ // central authority has no direct acces
             voters:0
         });
         central = createProject(request);
+        taxCollection = new TaxCollection(owner, central.getAddress());
     }
     
     
@@ -197,15 +316,12 @@ contract Central_Authority is Official{ // central authority has no direct acces
         
         return newProject;
     }
-    
-    function requestGrant(string memory _subject,string memory _document_url,Project _requester) public{
-        
-        
-        
-    }
+
 }
 
 contract TaxCollection is Official{
+
+    address centralProjectAddress;
 
     struct TaxBracket {
         uint code;
@@ -234,9 +350,11 @@ contract TaxCollection is Official{
         _;
     }
 
-    constructor() public {
+    constructor(address _owner, address _centralProjectAddress) public {
+        owner=_owner;
         taxPayerCount=0;
         bracketCount=0;
+        centralProjectAddress=_centralProjectAddress;
     }
 
     function getBudgetBalance() public view returns (uint) {
@@ -297,7 +415,7 @@ contract TaxCollection is Official{
         return _tax;
     }
 
-    function payTax() public taxNotPaid payable {
+    function payTax() public taxNotPaid payable { /// this is incorrect, transfer function is always initiated by the contract address.
         address(this).transfer(calculateTax()); // asynchronous; next statement should only execute once this has returned, make sure of that afterwards
         // check who pays wei here
         taxPayers[msg.sender].taxPaid=true;
@@ -314,9 +432,8 @@ contract TaxCollection is Official{
         return taxPayers[taxPayersAddresses[_id]].taxPaid;
     }
 
-    function grantFunds(address payable _schemeContractAddress, uint _amount) public officialOnly {
-        _schemeContractAddress.transfer(_amount); // not correct, make sure money is transferred from the contract account, not from the account of the official calling this function
-        // check who pays wei here
+    function grantFundsToCentralProject(uint _amount) public ownerOnly {
+        centralProjectAddress.transfer(_amount); 
         // call event;
     }
 
