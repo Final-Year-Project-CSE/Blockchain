@@ -415,9 +415,7 @@ contract TaxCollection is Official{
         return _tax;
     }
 
-    function payTax() public taxNotPaid payable { /// this is incorrect, transfer function is always initiated by the contract address.
-        address(this).transfer(calculateTax()); // asynchronous; next statement should only execute once this has returned, make sure of that afterwards
-        // check who pays wei here
+    function payTax() public taxNotPaid payable {
         taxPayers[msg.sender].taxPaid=true;
         // call event;
     }
