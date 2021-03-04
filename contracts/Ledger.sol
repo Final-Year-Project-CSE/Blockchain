@@ -29,10 +29,19 @@ contract Official {
     }
 }
 
-contract
-
 contract Project is Official{
 
+    struct Project_Request{
+        string Project_name;
+        string document_url;
+        string purpose;
+        address official_incharge;
+        address parent_project;
+        bool isComplete;
+        uint token_no;
+        uint voters;//this will keep count of positive vote count only
+        mapping(address=>bool) voted_officials;
+    }
     struct Grant_Request{
         string subject;
         string document_url;
@@ -52,7 +61,7 @@ contract Project is Official{
     string purpose;
     address parent_project;
     // need to find out a way to store the current progress status of the project, is it on time, behind schedule, how much work is done, etc.
-    address[] deployedProjects;
+    mapping(uint=>address) public deployedProjects;//mapping from token to project if created
     Central_Authority fatherbranch;
 
     Grant_Request[] grantRequestsQueue;
@@ -63,7 +72,8 @@ contract Project is Official{
             string memory _purpose,
             address _official_incharge,
             Central_Authority _father,
-            address _parent_project) public{
+            address _parent_project) public
+            {
         owner = _official_incharge;
         parent_project = _parent_project;
         Project_name = _Project_name;
@@ -78,21 +88,17 @@ contract Project is Official{
         return this.address;
     }
     
-    function getDeployedProjects() public view returns (address[] memory){
-        return deployedProjects;
-    }
-    
     // string public verification_result; // what purpose does it solve?
     // verification result is the output that has to be returned to the official on the front end, need not be saved on the blockchain
     
-    function verifyPending_Projects() public returns (string memory) { // as we wont be able to return a list, we can consider having an input of request ID, so that we can get the result for a particular request
+    function verifyPending_Projects(uint token_no) public returns (string memory) { // as we wont be able to return a list, we can consider having an input of request ID, so that we can get the result for a particular request
         //this will call the Central_Authority project evalution function and 
         //that function will check if the officials of Central_Authority has passed its sub-project or not
         //if the project has been passed then list of projects is receieved and it is added to the deployedProjects[]
         
         string memory verification_result; // we can actually just return a string directly without saving it in any variable.
 
-        Project  data = fatherbranch.verifyPending_Projects(msg.sender); // why do we explicitly need to pass msg.sender? 
+        Project  data = fatherbranch.verifyPending_Projects(token_no,this); // why do we explicitly need to pass msg.sender? 
         Project empty; // are we sure this wont waste memory? and are we sure the new project contract created and returned will persist?
         if(data == empty){
             verification_result = "No New Project added";
@@ -106,7 +112,8 @@ contract Project is Official{
         //if we have the list of requested projects for this project then we can check the request status of each project
     }
     
-    function addNewSubProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public ownerOnly {
+    
+    function addNewSubProjectRequest(string memory _projectName,string memory _purpose,string memory _url) public officialOnly returns (uint){
         //In this function we will check that only Officials can make request and all the data is valid
         // we will pass data to addNewProjectRequest function of Central_Authority contract
         bytes memory strBytes = bytes(_projectName);
@@ -116,8 +123,8 @@ contract Project is Official{
         strBytes = bytes(_url);
         require(strBytes.length != 0);
         
-        fatherbranch.addNewProjectRequest(_projectName,_url,_purpose,msg.sender);
-        
+        return fatherbranch.addNewProjectRequest(_projectName,_url,_purpose,msg.sender,this);
+        //returning the token no.
     }
     
     function requestGrant(string memory _subject,string memory _document_url,uint _weiAmountRequested) public ownerOnly returns (string, int) {
@@ -243,8 +250,11 @@ contract Central_Authority is Official{
         return newProject;
     }
 
-    Project_Request[] requestedProjects;
-    
+    // Project_Request[] ;
+    Grant_Request[] requestQueue;
+    mapping(uint => Project_Request) requestedProjects;//mapping from token to project address 
+    mapping(uint => Project) public deployed_projects;
+    uint token;
     constructor() public {
         Project_Request memory request = Project_Request({
             Project_name:"Central_Authority",
@@ -252,16 +262,19 @@ contract Central_Authority is Official{
             purpose:'',
             official_incharge:owner,
             parent_project:owner,
+            token_no:0,
             isComplete:true,
             voters:0
         });
+        token = 1;
         central = createProject(request);
         taxCollection = new TaxCollection(owner, central.getAddress());
     }
     
     
-    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose, address _official_incharge,address _parent_project) public returns (string memory) {
+    function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose, address _official_incharge,address _parent_project) public returns (uint) {
         //In this function we will make the struct of current request and add that to the list of requestedProjects[]
+        
         Project_Request memory new_request = Project_Request({
             Project_name:_Project_name,
             document_url:_document_url,
@@ -269,26 +282,19 @@ contract Central_Authority is Official{
             official_incharge:_official_incharge,
             parent_project:_parent_project, // why not use msg.sender? (probable reason:-maybe msg.sender=contract address but that actually sounds fine, will help identify the parent project of the sub project)
             isComplete:false,
+            token_no:token,
             voters:0
         });
         
-        string memory res="";
+        requestedProjects[token] = new_request;
+
+        token++;
         
-        uint n = requestedProjects.length;
-        for(uint i=0;i<n;i++){
-            if(requestedProjects[i].requester == msg.sender){ // if this official has an already incomplete project request, first that has to be completed
-                if(!requestedProjects[i].isComplete){
-                    res = "There is already a request Added";
-                    return res;
-                }
-            }
-        }
-        requestedProjects.push(new_request);
-        res = "Request Added";
-        return res;
+        return token;
     }
-    
-    function voteForProject(uint _index,bool _decision) public officialOnly {
+
+    //here index reassemble token
+    function voteForProject(uint index,bool _decision) public officialOnly {
         Project_Request storage request = requestedProjects[index];
         
         require(!request.voted_officials[msg.sender]);//the person has not voted so far
@@ -299,19 +305,24 @@ contract Central_Authority is Official{
         
     }
     
-    function verifyPending_Projects(address _curr_person) public returns(Project){ // who is curr_person? why didnt you use msg.sender
+    function verifyPending_Projects(uint _token, address _requesting_project) public returns(Project){ // who is curr_person? why didnt you use msg.sender
         
         Project newProject;
-        uint n = requestedProjects.length;
-        for(uint i=0;i<n;i++){
-            if(requestedProjects[i].requester == curr_person){
-                if(requestedProjects[i].voters >= total_officals && !requestedProjects[i].isComplete){
-                    
-                    newProject = createProject(requestedProjects[i]);
-                    
-                    requestedProjects[i].isComplete = true;
-                }
-            }
+        // uint n = requestedProjects.length;
+        Project_Request current_req = requestedProjects[token];
+        //if value for some key doesn't exist the mapping will return the default value of that data type
+        //as I have custom mapping so need to following below method
+        Project_Request cmp;
+        require(current_req != cmp);//case for invalid token
+        require(current_req.parent_project == _requesting_project);
+
+        if(current_req.voters >= total_officals && !current_req.isComplete){
+            
+            newProject = createProject(current_req);
+            
+            current_req.isComplete = true;
+
+            deployed_projects[current_req.token_no] = newProject;
         }
         
         return newProject;
