@@ -27,6 +27,10 @@ contract Official {
         officials[_add]=true;
         total_officals++;
     }
+
+    function getBalance() public view returns (uint) {
+        return address(this).balance;
+    }
 }
 
 contract Project is Official{
@@ -161,7 +165,7 @@ contract Project is Official{
     }
 
     function haveSufficientFunds(uint _weiAmount) private returns (bool) {
-        if(this.balance > (2 ether + _weiAmount)) { // 2 ether is added to maintain a minimum balance in contract to perform other necessary operations, amount can be changed as required
+        if(address(this).balance > (2 ether + _weiAmount)) { // 2 ether is added to maintain a minimum balance in contract to perform other necessary operations, amount can be changed as required
             return true;
         } return false;
     }
@@ -246,8 +250,6 @@ contract Central_Authority is Official{
         return newProject;
     }
 
-    // Project_Request[] ;
-    Grant_Request[] requestQueue;
     mapping(uint => Project_Request) requestedProjects;//mapping from token to project address 
     mapping(uint => Project) public deployed_projects;
     uint token;
@@ -267,6 +269,7 @@ contract Central_Authority is Official{
         taxCollection = new TaxCollection(owner, address(this));
     }
     
+    function() external payable {}
     
     function addNewProjectRequest(string memory _Project_name,string memory _document_url,string memory _purpose, address _official_incharge) public returns (uint) {
         //In this function we will make the struct of current request and add that to the list of requestedProjects[]
@@ -369,11 +372,7 @@ contract TaxCollection is Official{
         centralAuthorityAddress=_centralAuthorityAddress;
     }
 
-    function getBudgetBalance() public view returns (uint) {
-        return address(this).balance;
-    }
-
-    function() payable external {} // so that other accounts can send ether to the account of this smart contract
+    function() payable external {}
 
     function addTaxPayer(string memory _name, address _address, uint _annualIncome) public officialOnly {
         taxPayers[_address]=TaxPayer(taxPayerCount, _name, false, _annualIncome);
