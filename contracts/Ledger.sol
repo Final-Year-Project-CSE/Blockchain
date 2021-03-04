@@ -35,21 +35,11 @@ contract Official {
 
 contract Project is Official{
 
-    struct Project_Request{
-        string Project_name;
-        string document_url;
-        string purpose;
-        address official_incharge;
-        address parent_project;
-        bool isComplete;
-        uint voters;//this will keep count of positive vote count only
-        mapping(address=>bool) voted_officials;
-    }
     struct Grant_Request{
         string subject;
         string document_url;
         uint weiRequested;
-        address project; // we must only need the address of the project for which the grant is requested, because the requester will obviously have to be an official in charge of that project (we will also make sure that a grant is requested only when a certain percentage of officials in charge of that project have voted for the request to be initiated, that has to be a part of Project contract)
+        address payable project; // we must only need the address of the project for which the grant is requested, because the requester will obviously have to be an official in charge of that project (we will also make sure that a grant is requested only when a certain percentage of officials in charge of that project have voted for the request to be initiated, that has to be a part of Project contract)
         bool isAccepted; // true means grant has been sanctioned, and money has already been transfered to the corresponding project, false does not mean it is rejected, it may mean that it has not been reviewed yet, so we need to have a different variable to see if it is pending or has been reviewed
         bool isPending; // will be true initially, set to true when isAccepted is either set to true or false
         bool isOpen; // after the request is granted it needs to be closed
@@ -62,9 +52,10 @@ contract Project is Official{
     string Project_name;
     string document_url;
     string purpose;
-    address parent_project;
+    address payable parent_project;
     // need to find out a way to store the current progress status of the project, is it on time, behind schedule, how much work is done, etc.
-    mapping(uint=>address) public deployedProjects;//mapping from token to project if created
+    mapping(uint=>address) public subProjectAddress;//mapping from token to project if created, not possible to traverse this without creating a different array to store tokens in order
+    uint[] tokenNoForSubProject;
     Central_Authority fatherbranch;
 
     Grant_Request[] grantRequestsQueue;
@@ -75,7 +66,7 @@ contract Project is Official{
             string memory _purpose,
             address _official_incharge,
             Central_Authority _father,
-            address _parent_project) public
+            address payable _parent_project) public
             {
         owner = _official_incharge;
         parent_project = _parent_project;
@@ -94,21 +85,17 @@ contract Project is Official{
         //this will call the Central_Authority project evalution function and 
         //that function will check if the officials of Central_Authority has passed its sub-project or not
         //if the project has been passed then list of projects is receieved and it is added to the deployedProjects[]
-        
-        string memory verification_result; // we can actually just return a string directly without saving it in any variable.
 
-        Project  data = fatherbranch.verifyPending_Projects(token_no); // why do we explicitly need to pass msg.sender? 
+        Project  data = fatherbranch.verifyPending_Projects(token_no);
         Project empty; // are we sure this wont waste memory? and are we sure the new project contract created and returned will persist?
         if(data == empty){
-            verification_result = "No New Project added";
+            return "No New Project added";
         }
         else{
-            deployedProjects[token_no] = address(data);
-            verification_result = "New Project Added";
+            subProjectAddress[token_no] = address(data);
+            tokenNoForSubProject.push(token_no);
+            return "New Project Added";
         }
-        return verification_result;
-
-        //if we have the list of requested projects for this project then we can check the request status of each project
     }
     
     
@@ -126,20 +113,20 @@ contract Project is Official{
         //returning the token no.
     }
     
-    function requestGrant(string memory _subject,string memory _document_url,uint _weiAmountRequested) public ownerOnly returns (string, int) {
+    function requestGrant(string memory _subject,string memory _document_url,uint _weiAmountRequested) public ownerOnly returns (string memory, int) {
         return Project(parent_project).handleGrantRequest(_subject, _document_url, _weiAmountRequested); // gotta make sure the instance parent project created here is not permanently stored on blockchain, it has to be just a storage pointer to the already deployed project and should be removed from memory when this function is returned
     }
 
-    function checkRequestStatus(uint _requestID) public returns (bool, bool) {
+    function checkRequestStatus(uint _requestID) public view returns (bool, bool) {
         return Project(parent_project).grantApprovalCheck(_requestID);
     }
 
-    function handleGrantRequest(string memory _subject,string memory _document_url, uint _weiAmountRequested) external returns (string, int) {
+    function handleGrantRequest(string memory _subject,string memory _document_url, uint _weiAmountRequested) public returns (string memory, int) {
 
         // check if the requesting project is a sub project
-        uint n = deployedProjects.length;
+        uint n = tokenNoForSubProject.length;
         for(uint i=0; i<n; ++i){
-            if(deployedProjects[i]==msg.sender) {
+            if(subProjectAddress[tokenNoForSubProject[i]]==msg.sender) {
                 grantRequestsQueue.push( Grant_Request ({
                     subject: _subject,
                     document_url: _document_url,
@@ -152,7 +139,7 @@ contract Project is Official{
                     positiveVotes: 0,
                     ownerApproved: false
                 }));
-                return ("Request Added", grantRequestsQueue.length-1);
+                return ("Request Added", int(grantRequestsQueue.length-1));
             }
         }
         return ("Request Inapplicable", -1);
@@ -163,13 +150,13 @@ contract Project is Official{
         return (request.isPending, request.isAccepted);
     }
 
-    function haveSufficientFunds(uint _weiAmount) private returns (bool) {
+    function haveSufficientFunds(uint _weiAmount) private view returns (bool) {
         if(address(this).balance > (2 ether + _weiAmount)) { // 2 ether is added to maintain a minimum balance in contract to perform other necessary operations, amount can be changed as required
             return true;
         } return false;
     }
 
-    function grantFunds(address _projectAddress, uint _weiRequested) private {
+    function grantFunds(address payable _projectAddress, uint _weiRequested) private {
         _projectAddress.transfer(_weiRequested);
     }
 
@@ -187,11 +174,11 @@ contract Project is Official{
         if(msg.sender==owner)
             request.ownerApproved=true;
 
-        if(request.ownerApproved==true && request.positiveVotes > 0.7*total_officals)
+        if(request.ownerApproved==true && request.positiveVotes > (7*total_officals)/10)
         {
             request.isPending=false;
             request.isAccepted=true;
-        } else if (request.totalVotes - request.positiveVotes >= 0.3*total_officals) {
+        } else if (request.totalVotes - request.positiveVotes >= (3*total_officals)/10) {
             request.isPending=false;
             request.isAccepted=false;
         }
@@ -222,7 +209,6 @@ contract Project is Official{
             }
         }
     }
-
 }
 
 contract Central_Authority is Official{
@@ -234,7 +220,7 @@ contract Central_Authority is Official{
         string document_url;
         string purpose;
         address official_incharge;
-        address parent_project;
+        address payable parent_project;
         bool isComplete;
         uint voters;//this will keep count of positive vote count only
         mapping(address=>bool) voted_officials;
@@ -250,15 +236,16 @@ contract Central_Authority is Official{
     }
 
     mapping(uint => Project_Request) requestedProjects;//mapping from token to project address 
-    mapping(uint => Project) public deployed_projects;
+    mapping(uint => address) public deployedProjectsAddresses; // may become costly otherwise, shouldnt overload blockchain
     uint token;
+
     constructor() public {
         Project_Request memory request = Project_Request({
             Project_name:"Central_Authority",
             document_url:"",
             purpose:'',
             official_incharge:owner,
-            parent_project:owner,
+            parent_project:address(this), // had to be a payable address
             isComplete:true,
             voters:0
         });
@@ -281,35 +268,35 @@ contract Central_Authority is Official{
             isComplete:false,
             voters:0
         });
-        
-        requestedProjects[token] = new_request;
 
+        requestedProjects[token] = new_request;
         token++;
-        
         return token-1;
     }
 
     //here index reassemble token
-    function voteForProject(uint index,bool _decision) public officialOnly {
-        Project_Request storage request = requestedProjects[index];
+    function voteForProject(uint _index,bool _decision) public officialOnly {
+        Project_Request storage request = requestedProjects[_index];
         
         require(!request.voted_officials[msg.sender]);//the person has not voted so far
         
         request.voted_officials[msg.sender]=true;
         if(_decision)
             request.voters++;
-        
     }
     
-    function verifyPending_Projects(uint _token) public returns(Project){ // who is curr_person? why didnt you use msg.sender
+    function verifyPending_Projects(uint _token) public returns(Project){
+
+        require(_token>=1 && _token<token); // checking token validity
         
         Project newProject;
         // uint n = requestedProjects.length;
         Project_Request storage current_req = requestedProjects[_token];
         //if value for some key doesn't exist the mapping will return the default value of that data type
         //as I have custom mapping so need to following below method
-        Project_Request memory cmp;
-        require(current_req != cmp);//case for invalid token
+        // Project_Request memory cmp;
+        // require(current_req != cmp);//case for invalid token
+
         require(current_req.parent_project == msg.sender);
 
         if(current_req.voters >= total_officals && !current_req.isComplete){ //currently it requires all of the officials to vote in favour
@@ -318,7 +305,7 @@ contract Central_Authority is Official{
             
             current_req.isComplete = true;
 
-            deployed_projects[_token] = newProject;
+            deployedProjectsAddresses[_token] = address(newProject);
         }
         
         return newProject;
@@ -328,12 +315,11 @@ contract Central_Authority is Official{
         address(central).transfer(_amount); 
         // call event;
     }
-
 }
 
 contract TaxCollection is Official{
 
-    address centralAuthorityAddress;
+    address payable centralAuthorityAddress;
 
     struct TaxBracket {
         uint code;
@@ -362,7 +348,7 @@ contract TaxCollection is Official{
         _;
     }
 
-    constructor(address _owner, address _centralAuthorityAddress) public {
+    constructor(address _owner, address payable _centralAuthorityAddress) public {
         owner=_owner;
         taxPayerCount=0;
         bracketCount=0;
