@@ -26,7 +26,7 @@ contract Project is Official{
     // need to find out a way to store the current progress status of the project, is it on time, behind schedule, how much work is done, etc.
     mapping(uint=>address) public subProjectAddress;//mapping from token to project if created, not possible to traverse this without creating a different array to store tokens in order
     uint[] tokenNoForSubProject;
-    Central_Authority fatherbranch;
+    address payable fatherbranch;
 
     Grant_Request[] grantRequestsQueue;
 
@@ -35,7 +35,7 @@ contract Project is Official{
             string memory _document_url,
             string memory _purpose,
             address _official_incharge,
-            Central_Authority _father,
+            address payable _father,
             address payable _parent_project) public
             {
         owner = _official_incharge;
@@ -47,6 +47,10 @@ contract Project is Official{
     }
 
     function() payable external {}
+
+    function getProjectInfo() public view returns (string memory, string memory, string memory, address) {
+        return (Project_name, document_url, purpose, parent_project);
+    }
     
     // string public verification_result; // what purpose does it solve?
     // verification result is the output that has to be returned to the official on the front end, need not be saved on the blockchain
@@ -56,7 +60,7 @@ contract Project is Official{
         //that function will check if the officials of Central_Authority has passed its sub-project or not
         //if the project has been passed then list of projects is receieved and it is added to the deployedProjects[]
 
-        Project  data = fatherbranch.verifyPending_Projects(token_no);
+        Project  data = Central_Authority(fatherbranch).verifyPending_Projects(token_no);
         Project empty; // are we sure this wont waste memory? and are we sure the new project contract created and returned will persist?
         if(data == empty){
             return "No New Project added";
@@ -79,7 +83,7 @@ contract Project is Official{
         strBytes = bytes(_url);
         require(strBytes.length != 0);
         
-        return fatherbranch.addNewProjectRequest(_projectName,_url,_purpose,msg.sender);
+        return Central_Authority(fatherbranch).addNewProjectRequest(_projectName,_url,_purpose,msg.sender);
         //returning the token no.
     }
     

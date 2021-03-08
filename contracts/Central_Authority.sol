@@ -22,7 +22,7 @@ contract Central_Authority is Official{
     TaxCollection taxCollection;
 
     function createProject(Project_Request memory _request) private returns (Project ) {
-        Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.official_incharge,this,_request.parent_project);
+        Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.official_incharge,address(this),_request.parent_project);
         return newProject;
     }
 

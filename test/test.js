@@ -174,9 +174,18 @@ contract("Project", accounts => {
 contract("Central Authority", accounts => {
 	let instance;
 	let owner=accounts[0];
+	let centralProject;
 
 	before(async function() {
 		instance = await Central_Authority.deployed({from: owner});
+	});
+
+	it("Checking Central project", async function() {
+		centralProject = await instance.central();
+		const centralInfo = await = central.getProjectInfo();
+		assert.equal(centralInfo[0], "Central_Authority");
+		const parent = await instance.getContractAddress();
+		assert(parent, centralInfo[3]);
 	});
 
 	// it("Central Authority gets successfully deployed", async function() {
