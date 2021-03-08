@@ -17,3 +17,5 @@ contract Migrations {
     last_completed_migration = completed;
   }
 }
+
+// Required by truffle suite

@@ -45,7 +45,7 @@ module.exports = {
      development: {
       host: "127.0.0.1",     // Localhost (default: none)
       port: 7545,            // Standard Ethereum port (default: none) // it was initially 8545
-      network_id: "*",       // Any network (default: none) // I can se 5777 on ganache but that may change everytime I start ganache
+      network_id: "*",       // Any network (default: none) // I can see 5777 on ganache
      },
      rinkeby: {
       host: "localhost",

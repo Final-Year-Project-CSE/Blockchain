@@ -1,5 +1,7 @@
-var Ledger = artifacts.require('./Ledger.sol');
+var CentralAuthority = artifacts.require('./Central_Authority.sol');
+var Official = artifacts.require('./Official.sol');
 
 module.exports = function(deployer){
-    deployer.deploy(Election);
+	deployer.deploy(Official);
+    deployer.deploy(CentralAuthority);
 }

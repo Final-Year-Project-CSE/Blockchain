@@ -5,7 +5,7 @@ contract Official {
     address owner;
     
     mapping(address => bool) officials;
-    uint total_officals;
+    uint public total_officals;
 
     modifier officialOnly {
         require(officials[msg.sender]==true);
@@ -19,13 +19,22 @@ contract Official {
 
     constructor() public {
         owner=msg.sender;
-        total_officals=0;
-        addOfficial(owner);
+        officials[owner]=true;
+        total_officals=1;
     }
 
-    function addOfficial(address _add) public officialOnly{
+    function addOfficial(address _add) public officialOnly {
+        if(officials[_add]==true) // Already an official
+            return;
         officials[_add]=true;
         total_officals++;
+    }
+
+    function removeOfficial(address _add) public officialOnly {
+        if(officials[_add]==true) {
+            officials[_add]=false;
+            total_officals--;
+        }
     }
 
     function getBalance() public view returns (uint) {
