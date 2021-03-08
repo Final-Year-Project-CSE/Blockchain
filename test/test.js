@@ -3,10 +3,6 @@ const Project = artifacts.require("./Project.sol");
 const Official = artifacts.require("./Official.sol");
 const TaxCollection = artifacts.require("./TaxCollection.sol");
 
-// require('chai')
-//     .use(require('chai-as-promised'))
-//     .should();
-
 contract("Official", accounts => {
 	let instance;
 	const owner = accounts[0];
@@ -55,11 +51,131 @@ contract("Official", accounts => {
 
 	it("Checking Balance", async function () {
 		const balance = await instance.getBalance();
-		assert.equal(balance, 2);
+		assert.equal(balance, 2); // it should have been 2 as value is supplied but is actually 0
 	});
 });
 
-contract("Central_Authority", accounts => {
+contract("Tax Collection", accounts => {
+	let instance;
+	let owner;
+	let centralAuth;
+
+	beforeEach(async function() {
+		instance = await TaxCollection.deployed({from: accounts[1]});
+		owner = await instance.owner();
+		centralAuth = await instance.centralAuthorityAddress();
+		assert.equal(owner, accounts[0]);
+		assert.equal(centralAuth, accounts[1]);
+	});
+	
+	it("Owner Adds a Tax Payer", async function() {
+		await instance.addTaxPayer("Albert", accounts[2], 100, {from: owner});
+		const taxPayersCount = await instance.getTotalTaxPayers();
+		assert.equal(taxPayersCount, 1);
+		let taxPayer = await instance.getTaxPayerWithAddress(accounts[2]);
+		assert.equal(taxPayer[1], "Albert");
+		taxPayer = await instance.getTaxPayerWithID(taxPayersCount-1);
+		assert.equal(taxPayer[3], 100);
+	});
+
+	it("Official Adds a Tax Payer", async function() {
+		await instance.addOfficial(accounts[3], {from: owner});
+		await instance.addTaxPayer("Jonathan", accounts[4], 300, {from: accounts[3]});
+		const taxPayersCount = await instance.getTotalTaxPayers();
+		assert.equal(taxPayersCount, 2);
+		let taxPayer = await instance.getTaxPayerWithAddress(accounts[4]);
+		assert.equal(taxPayer[1], "Jonathan");
+		taxPayer = await instance.getTaxPayerWithID(taxPayersCount-1);
+		assert.equal(taxPayer[3], 300);
+	});
+
+	it("Official Adds Tax Bracket", async function() {
+		await instance.addTaxBracket(2, 150, 6, {from: accounts[3]});
+		const taxBracketsCount = await instance.getTotalTaxBrackets();
+		assert.equal(taxBracketsCount, 1);
+		const taxBracket = await instance.getTaxBracket(taxBracketsCount-1);
+		assert.equal(taxBracket[0], 0);
+		assert.equal(taxBracket[1], 2);
+	});
+
+	it("Official Updating Tax Bracket", async function() {
+		await instance.updateLowerLimitOfBracket(0, 0);
+		await instance.updateUpperLimitOfBracket(0, 100);
+		await instance.updateTaxPercentageOfBracket(0, 5);
+		const taxBracketsCount = await instance.getTotalTaxBrackets();
+		assert.equal(taxBracketsCount, 1);
+		const taxBracket = await instance.getTaxBracket(0);
+		assert.equal(taxBracket[1], 0);
+		assert.equal(taxBracket[2], 100);
+		assert.equal(taxBracket[3], 5);
+	});
+
+	it("Disable and Enable Tax Bracket", async function() {
+		await instance.disableTaxBracket(0);
+		let taxBracketsCount = await instance.getTotalTaxBrackets();
+		assert.equal(taxBracketsCount, 1);
+		let taxBracket = await instance.getTaxBracket(0);
+		assert.equal(taxBracket[4], false);
+		await instance.enableTaxBracket(0);
+		taxBracketsCount = await instance.getTotalTaxBrackets();
+		assert.equal(taxBracketsCount, 1);
+		taxBracket = await instance.getTaxBracket(0);
+		assert.equal(taxBracket[4], true);
+	});
+
+	it("Calculates Tax", async function() {
+		await instance.addTaxPayer("Mila", accounts[5], 0, {from: owner});
+		await instance.addTaxPayer("Emma", accounts[6], 400, {from: owner});
+		await instance.addTaxPayer("Stanley", accounts[7], 600, {from: owner});
+		await instance.addTaxBracket(100, 300, 10, {from: owner});
+		await instance.addTaxBracket(300, 500, 20, {from: owner});
+		let tax = await instance.calculateTax({from: accounts[2]});
+		assert.equal(tax, 5);
+		tax = await instance.calculateTax({from: accounts[4]});
+		assert.equal(tax, 25);
+		tax = await instance.calculateTax({from: accounts[5]});
+		assert.equal(tax, 0);
+		tax = await instance.calculateTax({from: accounts[6]});
+		assert.equal(tax, 45);
+		tax = await instance.calculateTax({from: accounts[7]});
+		assert.equal(tax, 65);
+	});
+
+	it("Pay Tax", async function() { // check balance before and after and try paying tax even though paid
+		let paid = await instance.hasPaidTax(accounts[2]);
+		assert.equal(paid, false);
+		let tax = await instance.calculateTax({from: accounts[2]});
+		await instance.payTax({from: accounts[2], value: tax});
+		paid = await instance.hasPaidTax(accounts[2]);
+		assert.equal(paid, true);
+		// try {
+		// 	await instance.payTax({from: accounts[2], value: tax});
+		// } catch (error) {
+		// 	assert.throws(() => { throw new Error(error) }, Error, "Tax Already Paid");
+		// }
+		tax = await instance.calculateTax({from: accounts[2]});
+		assert.equal(tax, 0);
+	});
+
+	it("Reset Tax Payments", async function() {
+		let paid = await instance.hasPaidTax(accounts[2]);
+		assert.equal(paid, true);
+		await instance.resetTaxPayments({from: owner});
+		paid = await instance.hasPaidTax(accounts[2]);
+		assert.equal(paid, false);
+	});
+
+	it("Sending Grant to Central Authority", async function() {
+		await instance.grantFundsToCentralAuthority(2, {from: owner});
+		// have to check balance before and after but balance is not working properly
+	});
+});
+
+contract("Project", accounts => {
+
+});
+
+contract("Central Authority", accounts => {
 
 	it("Central Authority gets successfully deployed", async function() {
 		try {

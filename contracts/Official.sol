@@ -2,7 +2,7 @@ pragma solidity ^0.5.16;
 
 contract Official {
 
-    address owner;
+    address public owner;
     
     mapping(address => bool) officials;
     uint public total_officals;
@@ -37,7 +37,7 @@ contract Official {
         }
     }
 
-    function getBalance() public view returns (uint) {
+    function getBalance() public view returns (uint) { // did not return balance during testing
         return address(this).balance;
     }
 }

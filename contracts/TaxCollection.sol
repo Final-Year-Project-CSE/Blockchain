@@ -4,7 +4,7 @@ import "./Official.sol";
 
 contract TaxCollection is Official{
 
-    address payable centralAuthorityAddress;
+    address payable public centralAuthorityAddress;
 
     struct TaxBracket {
         uint code;
@@ -80,15 +80,14 @@ contract TaxCollection is Official{
         uint _tax=0;
         for(uint _i=0; _i<bracketCount; ++_i) {
             if(taxBrackets[_i].validity==true) {
-                if(taxBrackets[_i].lowerLimit>_income) { // gotta do this as taxBrackets is stored as a mapping and it may not be in sorted order; find some way to sort the mapping in solidity efficiently
-                    if(taxBrackets[_i].upperLimit<=_income) {
+                if(taxBrackets[_i].lowerLimit<_income) { // gotta do this as taxBrackets is stored as a mapping and it may not be in sorted order; find some way to sort the mapping in solidity efficiently
+                    if(taxBrackets[_i].upperLimit>=_income) {
                         _tax+=taxBrackets[_i].percentage*(_income-taxBrackets[_i].lowerLimit)/100;
                     }
                     else {
                         _tax+=taxBrackets[_i].percentage*(taxBrackets[_i].upperLimit-taxBrackets[_i].lowerLimit)/100;
                     }
                 }
-                
             }
         }
         return _tax;
@@ -105,8 +104,8 @@ contract TaxCollection is Official{
         }
     }
 
-    function hasPaidTax(uint _id) public view returns (bool) { // solidity cannot return arrays of complex structures, to get a list we have to call for each individual
-        return taxPayers[taxPayersAddresses[_id]].taxPaid;
+    function hasPaidTax(address _address) public view returns (bool) { // solidity cannot return arrays of complex structures, to get a list we have to call for each individual
+        return taxPayers[_address].taxPaid;
     }
 
     function grantFundsToCentralAuthority(uint _amount) public ownerOnly {
@@ -114,4 +113,23 @@ contract TaxCollection is Official{
         // call event;
     }
 
+    function getTaxBracket(uint _code) public view returns (uint, uint, uint, uint, bool) {
+        return (taxBrackets[_code].code, taxBrackets[_code].lowerLimit, taxBrackets[_code].upperLimit, taxBrackets[_code].percentage, taxBrackets[_code].validity);
+    }
+
+    function getTotalTaxBrackets() public view returns (uint) {
+        return bracketCount;
+    }
+
+    function getTaxPayerWithAddress(address _address) public view returns (uint, string memory, bool, uint) {
+        return (taxPayers[_address].id, taxPayers[_address].name, taxPayers[_address].taxPaid, taxPayers[_address].annualIncome);
+    }
+
+    function getTaxPayerWithID(uint _id) public view returns (uint, string memory, bool, uint) {
+        return getTaxPayerWithAddress(taxPayersAddresses[_id]);
+    }
+
+    function getTotalTaxPayers() public view returns (uint) {
+        return taxPayerCount;
+    }
 }
