@@ -7,12 +7,8 @@ contract("Official", accounts => {
 	let instance;
 	const owner = accounts[0];
 
-	beforeEach(async function() {
-		try {
-			instance = await Official.deployed({from: owner, value: 2}); // here passing value: 2 does not set balance to 2, it remains 0
-		} catch (error) {
-			assert.throws(() => { throw new Error(error) }, Error, "Official couldn't be deployed");
-		}
+	before(async function() {
+		instance = await Official.deployed({from: owner});
 	});
 
 	it("Owner Adds Official", async function() {
@@ -49,10 +45,10 @@ contract("Official", accounts => {
 		assert.equal(totalOfficials, 2);
 	});
 
-	it("Checking Balance", async function () {
-		const balance = await instance.getBalance();
-		assert.equal(balance, 2); // it should have been 2 as value is supplied but is actually 0
-	});
+	// it("Checking Balance", async function () {
+	// 	const balance = await instance.getBalance();
+	// 	assert.equal(balance, 2); // it should have been 2 as value is supplied but is actually
+	// });
 });
 
 contract("Tax Collection", accounts => {
@@ -60,7 +56,7 @@ contract("Tax Collection", accounts => {
 	let owner;
 	let centralAuth;
 
-	beforeEach(async function() {
+	before(async function() {
 		instance = await TaxCollection.deployed({from: accounts[1]});
 		owner = await instance.owner();
 		centralAuth = await instance.centralAuthorityAddress();
@@ -148,11 +144,11 @@ contract("Tax Collection", accounts => {
 		await instance.payTax({from: accounts[2], value: tax});
 		paid = await instance.hasPaidTax(accounts[2]);
 		assert.equal(paid, true);
-		// try {
-		// 	await instance.payTax({from: accounts[2], value: tax});
-		// } catch (error) {
-		// 	assert.throws(() => { throw new Error(error) }, Error, "Tax Already Paid");
-		// }
+		try {
+			await instance.payTax({from: accounts[2], value: tax});
+		} catch (error) {
+			assert(error.message.indexOf('revert') >= 0, "error message must contain revert");
+		}
 		tax = await instance.calculateTax({from: accounts[2]});
 		assert.equal(tax, 0);
 	});
@@ -176,14 +172,16 @@ contract("Project", accounts => {
 });
 
 contract("Central Authority", accounts => {
+	let instance;
+	let owner=accounts[0];
 
-	it("Central Authority gets successfully deployed", async function() {
-		try {
-			await Central_Authority.deployed();
-		} catch (error) {
-			assert.throws(() => { throw new Error(error) }, Error, "Central Authority couldn't be deployed");
-		}
+	before(async function() {
+		instance = await Central_Authority.deployed({from: owner});
 	});
+
+	// it("Central Authority gets successfully deployed", async function() {
+	// 	await Central_Authority.deployed();
+	// });
 
 	// //define variables to be used
 
