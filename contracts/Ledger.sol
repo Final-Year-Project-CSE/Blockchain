@@ -305,8 +305,8 @@ contract Central_Authority is Official{
         Project_Request storage current_req = requestedProjects[_token];
         //if value for some key doesn't exist the mapping will return the default value of that data type
         //as I have custom mapping so need to following below method
-        Project_Request memory cmp;
-        require(current_req != cmp);//case for invalid token
+        // Project_Request memory cmp;
+        // require(current_req != cmp);//case for invalid token
         require(current_req.parent_project == msg.sender);
 
         if(current_req.voters >= total_officals && !current_req.isComplete){ //currently it requires all of the officials to vote in favour
