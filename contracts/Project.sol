@@ -48,8 +48,8 @@ contract Project is Official{
 
     function() payable external {}
 
-    function getProjectInfo() public view returns (string memory, string memory, string memory, address) {
-        return (Project_name, document_url, purpose, parent_project);
+    function getProjectInfo() public view returns (string memory, string memory, string memory, address, address) {
+        return (Project_name, document_url, purpose, parent_project, fatherbranch);
     }
     
     // string public verification_result; // what purpose does it solve?
@@ -60,15 +60,17 @@ contract Project is Official{
         //that function will check if the officials of Central_Authority has passed its sub-project or not
         //if the project has been passed then list of projects is receieved and it is added to the deployedProjects[]
 
-        Project  data = Central_Authority(fatherbranch).verifyPending_Projects(token_no);
-        Project empty; // are we sure this wont waste memory? and are we sure the new project contract created and returned will persist?
-        if(data == empty){
-            return "No New Project added";
-        }
-        else{
-            subProjectAddress[token_no] = address(data);
+        bool isDeployed;
+        address payable projectAddress;
+
+        (isDeployed, projectAddress) = Central_Authority(fatherbranch).verifyPending_Projects(token_no);
+
+        if(isDeployed) {
+            subProjectAddress[token_no] = projectAddress;
             tokenNoForSubProject.push(token_no);
             return "New Project Added";
+        } else {
+            return "No New Project added";
         }
     }
     

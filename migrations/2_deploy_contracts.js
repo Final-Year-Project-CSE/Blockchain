@@ -1,20 +1,15 @@
 var CentralAuthority = artifacts.require('./Central_Authority.sol');
 var Official = artifacts.require('./Official.sol');
 var TaxCollection = artifacts.require('./TaxCollection.sol');
+// var Project = artifacts.require('./Project');
 
-
-// // FOR ACTUAL EXECUTION
-// module.exports = function(deployer){ 
-//     deployer.deploy(CentralAuthority);
-// }
-
-
-// FOR TESTING PURPOSE
-module.exports = async function(deployer){ //we need to only deploye Central Authority here as other contracts are deployed by Central Authority only
-	deployer.deploy(Official); // only deployed for testing purpose
+module.exports = async function(deployer){
 
 	const accounts = await web3.eth.getAccounts();
 
-	deployer.deploy(TaxCollection, accounts[0], accounts[1]); // only deployed for testing purpose
-    deployer.deploy(CentralAuthority);
+	deployer.deploy(Official, {from: accounts[0]}); // only deployed for testing purpose
+
+	deployer.deploy(CentralAuthority, {from: accounts[0]}).then(function() {
+		return deployer.deploy(TaxCollection, CentralAuthority.address, {from: accounts[1]});
+	});
 }

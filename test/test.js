@@ -53,15 +53,15 @@ contract("Official", accounts => {
 
 contract("Tax Collection", accounts => {
 	let instance;
-	let owner;
+	let owner = accounts[1];
 	let centralAuth;
 
 	before(async function() {
-		instance = await TaxCollection.deployed({from: accounts[1]});
+		instance = await TaxCollection.deployed({from: owner});
 		owner = await instance.owner();
 		centralAuth = await instance.centralAuthorityAddress();
-		assert.equal(owner, accounts[0]);
-		assert.equal(centralAuth, accounts[1]);
+		assert.equal(owner, accounts[1]);
+		assert.equal(centralAuth, accounts[0]);
 	});
 	
 	it("Owner Adds a Tax Payer", async function() {
@@ -167,40 +167,54 @@ contract("Tax Collection", accounts => {
 	});
 });
 
-contract("Project", accounts => {
+// contract("Project", accounts => {
+// 	let instance;
+// 	const owner = accounts[0];
 
-});
+// 	before(async function() {
+// 		instance = await Project.deployed();
+// 	});
 
-contract("Central Authority", accounts => {
-	let instance;
-	let owner=accounts[0];
-	let centralProject;
+// 	it("Checking Project Info", async function() {
+// 		const info = await instance.getProjectInfo();
+// 		assert.equal(info[0], "Demo");
+// 		assert.equal(info[1], "www.demo.com");
+// 		assert.equal(info[2], "For Testing");
+// 		assert.equal(info[3], accounts[1]);
+// 		assert.equal(info[4], accounts[1]);
+// 	});
 
-	before(async function() {
-		instance = await Central_Authority.deployed({from: owner});
-	});
+// 	it("Request a Sub Project", async function() {
+// 		await instance.addNewSubProjectRequest("Sub Project", "For Testing", "www.sub.com", {from: owner});
+// 	})
 
-	it("Checking Central project", async function() {
-		centralProject = await instance.central();
-		const centralInfo = await = central.getProjectInfo();
-		assert.equal(centralInfo[0], "Central_Authority");
-		const parent = await instance.getContractAddress();
-		assert(parent, centralInfo[3]);
-	});
+	
+// });
 
-	// it("Central Authority gets successfully deployed", async function() {
-	// 	await Central_Authority.deployed();
-	// });
+// contract("Central Authority", accounts => {
+// 	let instance;
+// 	let owner=accounts[0];
 
-	// //define variables to be used
+// 	before(async function() {
+// 		instance = await Central_Authority.deployed({from: owner});
+// 	});
 
-	// beforeEach(async function () {
-	// 	// things to be done before each test case
-	// });
+// 	it("Checking Central project", async function() {
+		
+// 	});
 
-	// it("What the test case tests", async () => {
-	// 	// code for a single test case
-	// });
+// });
+
+// accounts is an array
+// use await on async functions to use them in sync in code
+// calling any function => f(params required, {from: account[x]});
+// get an instance of a contract => await Contract.new({ from: account[x] });
+// assert.equal(a,b,"some desc");
+// try {
+// 	//code
+// } catch (error) {
+// 	assert.throws(() => { throw new Error(error) }, Error, "Error Desc");
+// }
 
 	// // without using await
 	// it("desc", function() {
@@ -222,15 +236,3 @@ contract("Central Authority", accounts => {
  //            someVariable.should.equal(something);
  //        });
  //    });
-});
-
-// accounts is an array
-// use await on async functions to use them in sync in code
-// calling any function => f(params required, {from: account[x]});
-// get an instance of a contract => await Contract.new({ from: account[x] });
-// assert.equal(a,b,"some desc");
-// try {
-// 	//code
-// } catch (error) {
-// 	assert.throws(() => { throw new Error(error) }, Error, "Error Desc");
-// }
