@@ -33,11 +33,11 @@ contract TaxCollection is Official{
         _;
     }
 
-    constructor(address _owner, address payable _centralAuthorityAddress) public {
-        owner=_owner;
+    constructor(address payable _address) public {
+        owner=msg.sender;
         taxPayerCount=0;
         bracketCount=0;
-        centralAuthorityAddress=_centralAuthorityAddress;
+        centralAuthorityAddress=_address;
     }
 
     function() payable external {}

@@ -2,7 +2,6 @@ pragma solidity ^0.5.16;
 
 import "./Official.sol";
 import "./Project.sol";
-import "./TaxCollection.sol";
 
 contract Central_Authority is Official{
 
@@ -16,18 +15,15 @@ contract Central_Authority is Official{
         uint voters;//this will keep count of positive vote count only
         mapping(address=>bool) voted_officials;
     }
-    
-    Project public central;
 
-    TaxCollection taxCollection;
-
-    function createProject(Project_Request memory _request) private returns (Project ) {
-        Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.official_incharge,this,_request.parent_project);
-        return newProject;
+    function createProject(Project_Request memory _request, uint _token) private returns (address payable) {
+        Project newProject = new Project(_request.Project_name,_request.document_url,_request.purpose,_request.official_incharge,address(this),_request.parent_project);
+        deployedProjectsAddresses[_token] = address(newProject);
+        return deployedProjectsAddresses[_token];
     }
 
     mapping(uint => Project_Request) requestedProjects;//mapping from token to project address 
-    mapping(uint => address) public deployedProjectsAddresses; // may become costly otherwise, shouldnt overload blockchain
+    mapping(uint => address payable) public deployedProjectsAddresses; // may become costly otherwise, shouldnt overload blockchain
     uint token;
 
     constructor() public {
@@ -40,9 +36,7 @@ contract Central_Authority is Official{
             isComplete:true,
             voters:0
         });
-        token = 1;
-        central = createProject(request);
-        taxCollection = new TaxCollection(owner, address(this));
+        createProject(request, 0);        
     }
     
     function() external payable {}
@@ -76,34 +70,28 @@ contract Central_Authority is Official{
             request.voters++;
     }
     
-    function verifyPending_Projects(uint _token) public returns(Project){
+    function verifyPending_Projects(uint _token) public returns(bool, address payable){
 
         require(_token>=1 && _token<token); // checking token validity
-        
-        Project newProject;
-        // uint n = requestedProjects.length;
-        Project_Request storage current_req = requestedProjects[_token];
-        //if value for some key doesn't exist the mapping will return the default value of that data type
-        //as I have custom mapping so need to following below method
-        // Project_Request memory cmp;
-        // require(current_req != cmp);//case for invalid token
+    
+        Project_Request storage request = requestedProjects[_token];
 
-        require(current_req.parent_project == msg.sender);
+        require(request.parent_project == msg.sender);
 
-        if(current_req.voters >= total_officals && !current_req.isComplete){ //currently it requires all of the officials to vote in favour
+        address payable projectAddress;
+
+        if(request.voters >= total_officals && !request.isComplete) { //currently it requires all of the officials to vote in favour
             
-            newProject = createProject(current_req);
-            
-            current_req.isComplete = true;
-
-            deployedProjectsAddresses[_token] = address(newProject);
+            projectAddress = createProject(request, _token);
+            request.isComplete = true;
+            return (true, projectAddress);
         }
         
-        return newProject;
+        return (false, projectAddress);
     }
 
     function grantFundsToCentralProject(uint _amount) public ownerOnly {
-        address(central).transfer(_amount); 
+        deployedProjectsAddresses[0].transfer(_amount); 
         // call event;
     }
 }

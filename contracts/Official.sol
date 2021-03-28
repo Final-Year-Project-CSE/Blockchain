@@ -40,4 +40,8 @@ contract Official {
     function getBalance() public view returns (uint) { // did not return balance during testing
         return address(this).balance;
     }
+
+    function getContractAddress() public view returns (address) {
+        return address(this);
+    }
 }
