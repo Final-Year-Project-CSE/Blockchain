@@ -36,7 +36,8 @@ contract Central_Authority is Official{
             isComplete:true,
             voters:0
         });
-        createProject(request, 0);        
+        createProject(request, 0);
+        token=1;    
     }
     
     function() external payable {}
