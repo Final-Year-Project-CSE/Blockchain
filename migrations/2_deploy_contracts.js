@@ -6,10 +6,7 @@ var TaxCollection = artifacts.require('./TaxCollection.sol');
 module.exports = async function(deployer){
 
 	const accounts = await web3.eth.getAccounts();
+	const centralAuthContract = await deployer.deploy(CentralAuthority, {from: accounts[0]});
+	const taxCollectionContract = await deployer.deploy(TaxCollection, centralAuthContract.address, {from: accounts[0]});
 
-	deployer.deploy(Official, {from: accounts[0]}); // only deployed for testing purpose
-
-	deployer.deploy(CentralAuthority, {from: accounts[0]}).then(function() {
-		return deployer.deploy(TaxCollection, CentralAuthority.address, {from: accounts[1]});
-	});
 }

@@ -3,65 +3,74 @@ const Project = artifacts.require("./Project.sol");
 const Official = artifacts.require("./Official.sol");
 const TaxCollection = artifacts.require("./TaxCollection.sol");
 
-contract("Official", accounts => {
+contract("Central Authority", accounts => {
 	let instance;
-	const owner = accounts[0];
+	let owner=accounts[0];
 
 	before(async function() {
-		instance = await Official.deployed({from: owner});
+		instance = await Central_Authority.deployed({from: owner});
 	});
 
-	it("Owner Adds Official", async function() {
-		await instance.addOfficial(accounts[1], {from: owner});
-		const totalOfficials = await instance.total_officals();
-		assert.equal(totalOfficials, 2);
+	it("Checking Central project", async function() {
+		assert.equal(0,0);
 	});
-
-	it("An Official Adds Another Official", async function () {
-		await instance.addOfficial(accounts[1], {from: owner});
-		await instance.addOfficial(accounts[2], {from: accounts[1]});
-		const totalOfficials = await instance.total_officals();
-		assert.equal(totalOfficials, 3);
-	});
-
-	it("A Non-Official tries to add Another Official", async function () {
-		try {
-			await instance.addOfficial(accounts[4], {from: accounts[3]});
-		} catch (error) {
-			const totalOfficials = await instance.total_officals();
-			assert.equal(totalOfficials, 3);
-		}
-	});
-
-	it("Adding an already existing Official", async function () {
-		await instance.addOfficial(accounts[1], {from: owner});
-		const totalOfficials = await instance.total_officals();
-		assert.equal(totalOfficials, 3);
-	});
-
-	it("Removing an Official", async function () {
-		await instance.removeOfficial(accounts[1], {from: owner});
-		const totalOfficials = await instance.total_officals();
-		assert.equal(totalOfficials, 2);
-	});
-
-	// it("Checking Balance", async function () {
-	// 	const balance = await instance.getBalance();
-	// 	assert.equal(balance, 2); // it should have been 2 as value is supplied but is actually
-	// });
 });
 
+// contract("Official", accounts => {
+// 	let instance;
+// 	const owner = accounts[0];
+
+// 	before(async function() {
+// 		instance = await Official.deployed({from: owner});
+// 	});
+
+// 	it("Owner Adds Official", async function() {
+// 		await instance.addOfficial(accounts[1], {from: owner});
+// 		const totalOfficials = await instance.total_officals();
+// 		assert.equal(totalOfficials, 2);
+// 	});
+
+// 	it("An Official Adds Another Official", async function () {
+// 		await instance.addOfficial(accounts[1], {from: owner});
+// 		await instance.addOfficial(accounts[2], {from: accounts[1]});
+// 		const totalOfficials = await instance.total_officals();
+// 		assert.equal(totalOfficials, 3);
+// 	});
+
+// 	it("A Non-Official tries to add Another Official", async function () {
+// 		try {
+// 			await instance.addOfficial(accounts[4], {from: accounts[3]});
+// 		} catch (error) {
+// 			const totalOfficials = await instance.total_officals();
+// 			assert.equal(totalOfficials, 3);
+// 		}
+// 	});
+
+// 	it("Adding an already existing Official", async function () {
+// 		await instance.addOfficial(accounts[1], {from: owner});
+// 		const totalOfficials = await instance.total_officals();
+// 		assert.equal(totalOfficials, 3);
+// 	});
+
+// 	it("Removing an Official", async function () {
+// 		await instance.removeOfficial(accounts[1], {from: owner});
+// 		const totalOfficials = await instance.total_officals();
+// 		assert.equal(totalOfficials, 2);
+// 	});
+
+// 	// it("Checking Balance", async function () {
+// 	// 	const balance = await instance.getBalance();
+// 	// 	assert.equal(balance, 2); // it should have been 2 as value is supplied but is actually
+// 	// });
+// });
+
 contract("Tax Collection", accounts => {
+
 	let instance;
-	let owner = accounts[1];
-	let centralAuth;
+	let owner=accounts[0];
 
 	before(async function() {
 		instance = await TaxCollection.deployed({from: owner});
-		owner = await instance.owner();
-		centralAuth = await instance.centralAuthorityAddress();
-		assert.equal(owner, accounts[1]);
-		assert.equal(centralAuth, accounts[0]);
 	});
 	
 	it("Owner Adds a Tax Payer", async function() {
@@ -166,44 +175,6 @@ contract("Tax Collection", accounts => {
 		// have to check balance before and after but balance is not working properly
 	});
 });
-
-// contract("Project", accounts => {
-// 	let instance;
-// 	const owner = accounts[0];
-
-// 	before(async function() {
-// 		instance = await Project.deployed();
-// 	});
-
-// 	it("Checking Project Info", async function() {
-// 		const info = await instance.getProjectInfo();
-// 		assert.equal(info[0], "Demo");
-// 		assert.equal(info[1], "www.demo.com");
-// 		assert.equal(info[2], "For Testing");
-// 		assert.equal(info[3], accounts[1]);
-// 		assert.equal(info[4], accounts[1]);
-// 	});
-
-// 	it("Request a Sub Project", async function() {
-// 		await instance.addNewSubProjectRequest("Sub Project", "For Testing", "www.sub.com", {from: owner});
-// 	})
-
-	
-// });
-
-// contract("Central Authority", accounts => {
-// 	let instance;
-// 	let owner=accounts[0];
-
-// 	before(async function() {
-// 		instance = await Central_Authority.deployed({from: owner});
-// 	});
-
-// 	it("Checking Central project", async function() {
-		
-// 	});
-
-// });
 
 // accounts is an array
 // use await on async functions to use them in sync in code
