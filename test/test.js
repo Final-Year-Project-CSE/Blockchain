@@ -68,21 +68,9 @@ contract("Tax Collection", accounts => {
 
 	let instance;
 	let owner=accounts[0];
-	let centralAuth;
 
 	before(async function() {
 		instance = await TaxCollection.deployed({from: owner});
-	});
-
-	it("Checking Tax Collection", async function() {
-		assert.equal(0,0);
-	});
-
-	before(async function() {
-		instance = await TaxCollection.deployed({from: owner});
-		owner = await instance.owner();
-		centralAuth = await instance.centralAuthorityAddress();
-		assert.equal(owner, accounts[0]);
 	});
 	
 	it("Owner Adds a Tax Payer", async function() {
